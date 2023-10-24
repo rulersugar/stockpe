@@ -1,0 +1,15 @@
+{
+  "name": "stockpe",
+  "version": "1.0.0",
+  "description": "A prototype",
+  "main": "app.js",
+  "scripts": {
+    "test": "node app.js"
+  },
+  "author": "Santhosh-Annamalai",
+  "license": "Proprietary",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "type": "module"
+}
