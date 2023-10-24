@@ -1,6 +1,6 @@
 import { WebSocketServer } from "ws";
 const wss = new WebSocketServer({ port: 8080, clientTracking: true }, console.log("Running on port 8080"));
-let playerList = [];
+const playerList = [];
 
 wss.on("connection", function connection(ws) {
   ws.on("message", function message(data) {
@@ -12,7 +12,7 @@ wss.on("connection", function connection(ws) {
         console.log("" + data + " got matched with " + playerList[0][1]);
         ws.send("You got matched with " + playerList[0][1]);
         playerList[0][0].send("You got matched with " + data);
-        playerList = playerList.splice(0, 1);
+        playerList.splice(0, 1);
     }
   });
 
