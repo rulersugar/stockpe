@@ -3,6 +3,8 @@ const app = express();
 const btoa = require("btoa");
 const superagent = require("superagent");
 const config = require("./config.json");
+const stocksImport = require("./stocks.json");
+const stocks = stocksImport.list;
 // For parsing application/json
 app.use(express.json());
 // For parsing application/x-www-form-urlencoded
@@ -13,9 +15,38 @@ const playerList = [];
 const matchedList = [];
 const gamersList = [];
 
+function startStockPriceRandomizer() {
+  setInterval(randomizeStockPrices, Math.floor(Math.random() * (90 - 10) + 10) * 1000);
+}
+
+function randomizeStockPrices() {
+  const realisticPriceChange = () => (Math.random() * 0.4 - 0.2); // Simulate price change between -20% to 20%
+  for (let i = 0; i < stocks.length; i++) {
+    const stock = stocks[i];
+    const previousPrice = stock.Price;
+    const priceChange = realisticPriceChange();
+    const newPrice = Math.max(0.01, stock.Price + priceChange).toFixed(2); // Ensure the price has at most 2 digits after the decimal point
+    stock.Price = parseFloat(newPrice);
+    const priceDiff = stock.Price - previousPrice;
+    if (priceDiff > 0) {
+      stock.medium = "inc";
+      stock.percent = parseFloat((priceDiff / previousPrice * 100).toFixed(2));
+    } else if (priceDiff < 0) {
+      stock.medium = "dec";
+      stock.percent = parseFloat((priceDiff / previousPrice * 100).toFixed(2));
+    } else {
+      stock.medium = "same";
+      stock.percent = 0.00;
+    }
+  }
+}
+
+setInterval(randomizeStockPrices, 6000); // Randomize every 6 seconds
+
 app.listen(PORT, (error) => {
     if (!error) {
         console.log("Server is Successfully Running, and App is listening on port " + PORT);
+        startStockPriceRandomizer();
     }
     else {
         console.log("Error occurred, server can't start", error);
@@ -31,7 +62,6 @@ app.get("/match", (req, res) => {
     res.send({ status: "waiting" });
   }
   else if ((playerList.length === 1) && (filterCheck.length === 0) && (pair.length === 0)) {
-    console.log("" + req.query.clientName + " got matched with " + playerList[0].clientName);
     res.send({ status: "matched", clientID: playerList[0].clientID, clientName: playerList[0].clientName });
     matchedList.push([playerList[0].clientID, req.query.clientID, req.query.clientName, playerList[0].clientName]);
     playerList.splice(0, 1);
@@ -71,4 +101,8 @@ app.get("/auth", async (req, res) => {
   const userInfo = await superagent.get("https://openidconnect.googleapis.com/v1/userinfo").set(header);
   console.log(userInfo);
   res.send("OK");
+});
+
+app.get('/stocks', (req, res) => {
+  res.json(stocks);
 });
