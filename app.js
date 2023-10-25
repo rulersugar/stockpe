@@ -1,9 +1,13 @@
 const express = require("express");
 const app = express();
+const btoa = require("btoa");
+const superagent = require("superagent");
+const config = require("./config.json");
 // For parsing application/json
 app.use(express.json());
 // For parsing application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
+const { clientID, clientSecret, hostname } = config;
 const PORT = 3000;
 const playerList = [];
 const matchedList = [];
@@ -42,4 +46,29 @@ app.get("/match", (req, res) => {
     res.send({ status: "waiting" });
   }
   res.status(200);
+});
+
+app.get("/login", (req, res) => {
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email`)
+});
+
+app.get("/auth", async (req, res) => {
+  const headers = {
+    Authorization: `Basic ${btoa(`${clientID}:${clientSecret}`)}`,
+    "Content-Type": "x-www-form-urlencoded"
+  };
+  const queryParams = {
+    grant_type: "authorization_code",
+    code: req.query.code,
+    redirect_uri: `https://${hostname}/auth`
+  };
+
+  const request = await superagent.post("https://oauth2.googleapis.com/token").query(queryParams).set(headers);
+  const userToken = request.body.access_token;
+  const header = {
+    Authorization: `Bearer ${userToken}`
+  }
+  const userInfo = await superagent.get("https://openidconnect.googleapis.com/v1/userinfo").set(header);
+  console.log(userInfo);
+  res.send("OK");
 });

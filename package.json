@@ -9,7 +9,9 @@
   "author": "Santhosh-Annamalai",
   "license": "Proprietary",
   "dependencies": {
+    "btoa": "^1.2.1",
     "express": "^4.18.2",
+    "superagent": "^8.1.2",
     "ws": "^8.14.2"
   }
 }
