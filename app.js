@@ -4,6 +4,7 @@ const btoa = require("btoa");
 const superagent = require("superagent");
 const config = require("./config.json");
 const stocksImport = require("./stocks.json");
+const math = require("mathjs");
 const stocks = stocksImport.list;
 // For parsing application/json
 app.use(express.json());
@@ -64,6 +65,7 @@ app.get("/match", (req, res) => {
   else if ((playerList.length === 1) && (filterCheck.length === 0) && (pair.length === 0)) {
     res.send({ status: "matched", clientID: playerList[0].clientID, clientName: playerList[0].clientName });
     matchedList.push([playerList[0].clientID, req.query.clientID, req.query.clientName, playerList[0].clientName]);
+    gamersList.push([playerList[0].clientID, req.query.clientID, req.query.clientName, playerList[0].clientName]);
     playerList.splice(0, 1);
   }
   else if (pair.length === 1) {
@@ -103,6 +105,42 @@ app.get("/auth", async (req, res) => {
   res.send("OK");
 });
 
-app.get('/stocks', (req, res) => {
+app.get("/stocks", (req, res) => {
   res.json(stocks);
+});
+
+app.get("/result", (req, res) => {
+  const pair = gamersList.filter(match => (match[0] === req.body.clientID));
+  const index = gamersList.indexOf(pair);
+  if (pair[4] === undefined) {
+    const obj = {};
+    obj[req.query.clientID] = req.query.balance;
+    gamersList[index].push(obj);
+  }
+  else {
+    gamersList[index][4][req.query.clientID] = req.query.balance;
+    const objKeys = gamersList[index][4].keys();
+    let splicedData;
+  
+    if (objKeys.length === 2) {
+      const result = math.compare(gamersList[index][4][objKeys[0]], gamersList[index][4][objKeys[1]]);
+
+      if (gamersList[index][4]["downloaded"] === undefined) {
+        gamersList[index][4]["downloaded"] = [ req.query.clientID ];
+      }
+      else {
+        splicedData = gamersList.splice(index, 1);
+      }
+
+      if (result === 1) {
+        (splicedData === undefined) ? (res.send({ winner: objKeys[0], data: gamersList[index][4]})) : (res.send({ winner: objKeys[0], data: splicedData[4]}));
+      }
+      else if (result === -1) {
+        (splicedData === undefined) ? (res.send({ winner: objKeys[1], data: gamersList[index][4]})) : (res.send({ winner: objKeys[1], data: splicedData[4]}));
+      }
+      else if (result === 0) {
+        (splicedData === undefined) ? (res.send({ winner: "tie", data: gamersList[index][4]})) : (res.send({ winner: "tie", data: splicedData[4]}));
+      }
+    }
+  }
 });
