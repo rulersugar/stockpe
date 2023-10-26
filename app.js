@@ -80,8 +80,8 @@ app.get("/match", (req, res) => {
   res.status(200);
 });
 
-app.get("/login", (req, res) => {
-  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email`)
+app.get("/login", (_req, res) => {
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email`);
 });
 
 app.get("/auth", async (req, res) => {
@@ -101,11 +101,11 @@ app.get("/auth", async (req, res) => {
     Authorization: `Bearer ${userToken}`
   }
   const userInfo = await superagent.get("https://openidconnect.googleapis.com/v1/userinfo").set(header);
-  console.log(userInfo);
-  res.send("OK");
+
+  res.send(userInfo);
 });
 
-app.get("/stocks", (req, res) => {
+app.get("/stocks", (_req, res) => {
   res.json(stocks);
 });
 
