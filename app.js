@@ -71,8 +71,6 @@ app.get("/match", (req, res) => {
   else if (pair.length === 1) {
     res.send({ status: "matched", clientID: pair[0][1], clientName: pair[0][2] });
     matchedList.splice(0, 1);
-    gamersList.push(pair);
-    pair.splice(0, 1);
   }
   else if ((playerList.length === 1) && (filterCheck.length === 1)) {
     res.send({ status: "waiting" });
@@ -109,38 +107,86 @@ app.get("/stocks", (_req, res) => {
   res.json(stocks);
 });
 
+app.post("/balance", (req, res) => {
+  const response = stocks;
+  const portfolio = req.body;
+  let i = 0;
+  let n = 0;
+  let balance = 0;
+
+  function responseIteration(symbol) {
+    if (symbol === response[i].Symbol) {
+        const returnResponse = response[i].Price;
+        i = 0;
+        return returnResponse;
+    }
+    else {
+        i = i + 1;
+        return new Promise((resolve, _reject) => setTimeout(() => resolve(responseIteration(symbol)), 0));
+    }
+  }
+
+  async function calcBalance() {
+    if (n <= (portfolio.length - 1)) {
+        const { id, qty } = portfolio[n];
+        const idPrice = await responseIteration(id);
+        const stockPrice = (qty * idPrice);
+        balance = balance + stockPrice;
+        n = n + 1;
+        return new Promise((resolve, _reject) => setTimeout(() => resolve(calcBalance()), 0));
+    }
+    else {
+        return balance;
+    }
+  }
+
+  async function wrapper() {
+    const bal = await calcBalance();
+    res.send({
+      result: bal
+    });
+  }
+
+  wrapper();
+});
+
 app.get("/result", (req, res) => {
-  const pair = gamersList.filter(match => (match[0] === req.body.clientID));
-  const index = gamersList.indexOf(pair);
-  if (pair[4] === undefined) {
+  const pair = gamersList.filter(match => ((match[0] === req.query.clientID) || (match[1] === req.query.clientID)));
+  const index = gamersList.findIndex(match => ((match[0] === req.query.clientID) || (match[1] === req.query.clientID)));
+  if (pair[0].length === 4) {
     const obj = {};
     obj[req.query.clientID] = req.query.balance;
     gamersList[index].push(obj);
+    res.send({
+      result: "await"
+    });
+  }
+  else if ((Object.keys(pair[0][4])[0] !== req.query.clientID) || (Object.keys(pair[0][4]).length !== 1)) {
+    (gamersList[index][4])[req.query.clientID] = req.query.balance;
+    const objKeys = Object.keys(((gamersList[index])[4]));
+    const result = math.compare(gamersList[index][4][objKeys[0]], gamersList[index][4][objKeys[1]]);
+    let splicedData;
+
+    if (!Array.isArray(gamersList[index][4]["downloaded"])) {
+      gamersList[index][4]["downloaded"] = [ req.query.clientID ];
+    }
+    else {
+      splicedData = gamersList.splice(index, 1);
+    }
+
+    if (result === 1) {
+      (!Array.isArray(splicedData)) ? (res.send({ winner: objKeys[0], data: gamersList[index][4]})) : (res.send({ winner: objKeys[0], data: splicedData[0][4]}));
+    }
+    else if (result === -1) {
+      (!Array.isArray(splicedData)) ? (res.send({ winner: objKeys[1], data: gamersList[index][4]})) : (res.send({ winner: objKeys[1], data: splicedData[0][4]}));
+    }
+    else if (result === 0) {
+      (!Array.isArray(splicedData)) ? (res.send({ winner: "tie", data: gamersList[index][4]})) : (res.send({ winner: "tie", data: splicedData[0][4]}));
+    }
   }
   else {
-    gamersList[index][4][req.query.clientID] = req.query.balance;
-    const objKeys = gamersList[index][4].keys();
-    let splicedData;
-  
-    if (objKeys.length === 2) {
-      const result = math.compare(gamersList[index][4][objKeys[0]], gamersList[index][4][objKeys[1]]);
-
-      if (gamersList[index][4]["downloaded"] === undefined) {
-        gamersList[index][4]["downloaded"] = [ req.query.clientID ];
-      }
-      else {
-        splicedData = gamersList.splice(index, 1);
-      }
-
-      if (result === 1) {
-        (splicedData === undefined) ? (res.send({ winner: objKeys[0], data: gamersList[index][4]})) : (res.send({ winner: objKeys[0], data: splicedData[4]}));
-      }
-      else if (result === -1) {
-        (splicedData === undefined) ? (res.send({ winner: objKeys[1], data: gamersList[index][4]})) : (res.send({ winner: objKeys[1], data: splicedData[4]}));
-      }
-      else if (result === 0) {
-        (splicedData === undefined) ? (res.send({ winner: "tie", data: gamersList[index][4]})) : (res.send({ winner: "tie", data: splicedData[4]}));
-      }
-    }
+    res.send({
+      result: "await"
+    });
   }
 });
