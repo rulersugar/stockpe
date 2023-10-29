@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const btoa = require("btoa");
+const path = require('path');
 const superagent = require("superagent");
 const config = require("./config.json");
 const stocksImport = require("./stocks.json");
@@ -10,6 +11,7 @@ const stocks = stocksImport.list;
 app.use(express.json());
 // For parsing application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname + '/html')));
 const { clientID, clientSecret, hostname } = config;
 const PORT = 3000;
 const playerList = [];
@@ -54,6 +56,10 @@ app.listen(PORT, (error) => {
     }
   }
 );
+
+app.get("/", (_req, res) => {
+  res.sendFile(path.join(__dirname + "/html/index.html"));
+});
 
 app.get("/match", (req, res) => {
   const pair = matchedList.filter(match => (match[0] === req.query.clientID));
