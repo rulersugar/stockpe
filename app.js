@@ -6,6 +6,7 @@ const superagent = require("superagent");
 const config = require("./config.json");
 const stocksImport = require("./stocks.json");
 const math = require("mathjs");
+const crypto = require("crypto");
 const stocks = stocksImport.list;
 // For parsing application/json
 app.use(express.json());
@@ -17,6 +18,7 @@ const PORT = 3000;
 const playerList = [];
 const matchedList = [];
 const gamersList = [];
+const userDetails = {};
 
 function startStockPriceRandomizer() {
   setInterval(randomizeStockPrices, Math.floor(Math.random() * (90 - 10) + 10) * 1000);
@@ -57,6 +59,10 @@ app.listen(PORT, (error) => {
   }
 );
 
+app.get("/image", (req, res) => {
+  ((typeof userDetails[req.query.uuid]) !== "undefined") ? res.redirect(userDetails[req.query.uuid].picture) : "";
+});
+
 app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname + "/html/index.html"));
 });
@@ -69,23 +75,34 @@ app.get("/match", (req, res) => {
     res.send({ status: "waiting" });
   }
   else if ((playerList.length === 1) && (filterCheck.length === 0) && (pair.length === 0)) {
-    res.send({ status: "matched", clientID: playerList[0].clientID, clientName: playerList[0].clientName });
-    matchedList.push([playerList[0].clientID, req.query.clientID, req.query.clientName, playerList[0].clientName]);
-    gamersList.push([playerList[0].clientID, req.query.clientID, req.query.clientName, playerList[0].clientName]);
+    const pictures = {};
+    pictures[playerList[0].clientID] = playerList[0].clientAvatar;
+    pictures[req.query.clientID] = req.query.clientAvatar;
+    res.send({ status: "matched", clientID: playerList[0].clientID, clientName: playerList[0].clientName, clientAvatar: playerList[0].clientAvatar });
+    matchedList.push([playerList[0].clientID, req.query.clientID, req.query.clientName, playerList[0].clientName, req.query.clientAvatar]);
+    gamersList.push([playerList[0].clientID, req.query.clientID, req.query.clientName, playerList[0].clientName, pictures]);
     playerList.splice(0, 1);
   }
   else if (pair.length === 1) {
-    res.send({ status: "matched", clientID: pair[0][1], clientName: pair[0][2] });
+    res.send({ status: "matched", clientID: pair[0][1], clientName: pair[0][2], clientAvatar: pair[0][4] });
     matchedList.splice(0, 1);
   }
   else if ((playerList.length === 1) && (filterCheck.length === 1)) {
     res.send({ status: "waiting" });
   }
-  res.status(200);
 });
 
-app.get("/login", (_req, res) => {
-  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email`);
+app.get("/login", (req, res) => {
+  if (req.query.uuid === undefined) {
+    const uuid = crypto.randomUUID();
+    res.status(200).send({result: uuid});
+  }
+  else if ((typeof userDetails[req.query.uuid]) !== "undefined") {
+    res.send(userDetails[req.query.uuid]);
+  }
+  else {
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email&state=${req.query.uuid}`);
+  }
 });
 
 app.get("/auth", async (req, res) => {
@@ -105,8 +122,8 @@ app.get("/auth", async (req, res) => {
     Authorization: `Bearer ${userToken}`
   }
   const userInfo = await superagent.get("https://openidconnect.googleapis.com/v1/userinfo").set(header);
-
-  res.send(userInfo);
+  userDetails[req.query.state] = userInfo.body;
+  res.redirect(`https://${hostname}/page.Page7.html`);
 });
 
 app.get("/stocks", (_req, res) => {
@@ -159,7 +176,7 @@ app.post("/balance", (req, res) => {
 app.get("/result", (req, res) => {
   const pair = gamersList.filter(match => ((match[0] === req.query.clientID) || (match[1] === req.query.clientID)));
   const index = gamersList.findIndex(match => ((match[0] === req.query.clientID) || (match[1] === req.query.clientID)));
-  if (pair[0].length === 4) {
+  if (pair[0].length === 5) {
     const obj = {};
     obj[req.query.clientID] = req.query.balance;
     gamersList[index].push(obj);
@@ -167,27 +184,27 @@ app.get("/result", (req, res) => {
       result: "await"
     });
   }
-  else if ((Object.keys(pair[0][4])[0] !== req.query.clientID) || (Object.keys(pair[0][4]).length !== 1)) {
-    (gamersList[index][4])[req.query.clientID] = req.query.balance;
-    const objKeys = Object.keys(((gamersList[index])[4]));
-    const result = math.compare(gamersList[index][4][objKeys[0]], gamersList[index][4][objKeys[1]]);
+  else if ((Object.keys(pair[0][5])[0] !== req.query.clientID) || (Object.keys(pair[0][5]).length !== 1)) {
+    (gamersList[index][5])[req.query.clientID] = req.query.balance;
+    const objKeys = Object.keys(((gamersList[index])[5]));
+    const result = math.compare(gamersList[index][5][objKeys[0]], gamersList[index][5][objKeys[1]]);
     let splicedData;
 
-    if (!Array.isArray(gamersList[index][4]["downloaded"])) {
-      gamersList[index][4]["downloaded"] = [ req.query.clientID ];
+    if (!Array.isArray(gamersList[index][5]["downloaded"])) {
+      gamersList[index][5]["downloaded"] = [ req.query.clientID ];
     }
     else {
       splicedData = gamersList.splice(index, 1);
     }
 
     if (result === 1) {
-      (!Array.isArray(splicedData)) ? (res.send({ winner: objKeys[0], data: gamersList[index][4]})) : (res.send({ winner: objKeys[0], data: splicedData[0][4]}));
+      (!Array.isArray(splicedData)) ? (res.send({ winner: objKeys[0], winnerAvatar: gamersList[index][4][objKeys[0]], data: gamersList[index][5] })) : (res.send({ winner: objKeys[0], winnerAvatar: splicedData[0][4][objKeys[0]], data: splicedData[0][5] }));
     }
     else if (result === -1) {
-      (!Array.isArray(splicedData)) ? (res.send({ winner: objKeys[1], data: gamersList[index][4]})) : (res.send({ winner: objKeys[1], data: splicedData[0][4]}));
+      (!Array.isArray(splicedData)) ? (res.send({ winner: objKeys[1], winnerAvatar: gamersList[index][4][objKeys[1]], data: gamersList[index][5] })) : (res.send({ winner: objKeys[1], winnerAvatar: splicedData[0][4][objKeys[1]], data: splicedData[0][5] }));
     }
     else if (result === 0) {
-      (!Array.isArray(splicedData)) ? (res.send({ winner: "tie", data: gamersList[index][4]})) : (res.send({ winner: "tie", data: splicedData[0][4]}));
+      (!Array.isArray(splicedData)) ? (res.send({ winner: "tie", data: gamersList[index][5] })) : (res.send({ winner: "tie", data: splicedData[0][5] }));
     }
   }
   else {
