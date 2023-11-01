@@ -19,6 +19,7 @@ const playerList = [];
 const matchedList = [];
 const gamersList = [];
 const userDetails = {};
+const uuidList = [];
 
 function startStockPriceRandomizer() {
   setInterval(randomizeStockPrices, Math.floor(Math.random() * (90 - 10) + 10) * 1000);
@@ -95,10 +96,31 @@ app.get("/match", (req, res) => {
 app.get("/login", (req, res) => {
   if (req.query.uuid === undefined) {
     const uuid = crypto.randomUUID();
-    res.status(200).send({result: uuid});
+    uuidList.push(uuid);
+    res.status(200).send({ result: uuid });
   }
   else if ((typeof userDetails[req.query.uuid]) !== "undefined") {
-    res.send(userDetails[req.query.uuid]);
+    let i = 0;
+    for (const uuid of uuidList) {
+      if (uuid === req.query.uuid) {
+        uuidList.splice(i, 1);
+        for (const uuid in userDetails) {
+          if (uuid === req.query.uuid) {
+            const userInfo = userDetails[uuid];
+            delete userDetails[uuid];
+            res.send(userInfo);
+            break;
+          }
+        }
+        break;
+      }
+      else {
+        i = i + 1;
+      }
+    }
+  }
+  else if (uuidList.includes(req.query.uuid)) {
+    res.send({ OAuthComplete: false });
   }
   else {
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email&state=${req.query.uuid}`);
@@ -106,24 +128,36 @@ app.get("/login", (req, res) => {
 });
 
 app.get("/auth", async (req, res) => {
-  const headers = {
-    Authorization: `Basic ${btoa(`${clientID}:${clientSecret}`)}`,
-    "Content-Type": "x-www-form-urlencoded"
-  };
-  const queryParams = {
-    grant_type: "authorization_code",
-    code: req.query.code,
-    redirect_uri: `https://${hostname}/auth`
-  };
-
-  const request = await superagent.post("https://oauth2.googleapis.com/token").query(queryParams).set(headers);
-  const userToken = request.body.access_token;
-  const header = {
-    Authorization: `Bearer ${userToken}`
+  if (uuidList.includes(req.query.state) === true) {
+    const headers = {
+      Authorization: `Basic ${btoa(`${clientID}:${clientSecret}`)}`,
+      "Content-Type": "x-www-form-urlencoded"
+    };
+    const queryParams = {
+      grant_type: "authorization_code",
+      code: req.query.code,
+      redirect_uri: `https://${hostname}/auth`
+    };
+  
+    const request = await superagent.post("https://oauth2.googleapis.com/token").query(queryParams).set(headers);
+    const userToken = request.body.access_token;
+    const header = {
+      Authorization: `Bearer ${userToken}`
+    };
+    const userInfo = await superagent.get("https://openidconnect.googleapis.com/v1/userinfo").set(header);
+    
+    if (userInfo.body.email_verified === true) {
+      userDetails[req.query.state] = userInfo.body;
+      res.send("You've been logged in. Kindly get back to the application.");
+    }
+    else {
+      res.send("Your Google Account has not yet been verified. Kindly verify your Google Account and try again.");
+    }
   }
-  const userInfo = await superagent.get("https://openidconnect.googleapis.com/v1/userinfo").set(header);
-  userDetails[req.query.state] = userInfo.body;
-  res.redirect(`https://${hostname}/page.Page7.html`);
+  else {
+    res.status(403).send("Unauthorized.");
+    console.log(req);
+  }
 });
 
 app.get("/stocks", (_req, res) => {
