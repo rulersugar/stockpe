@@ -107,6 +107,7 @@ app.get("/login", (req, res) => {
         for (const uuid in userDetails) {
           if (uuid === req.query.uuid) {
             const userInfo = userDetails[uuid];
+            userInfo.OAuthComplete = true;
             delete userDetails[uuid];
             res.send(userInfo);
             break;
@@ -119,11 +120,11 @@ app.get("/login", (req, res) => {
       }
     }
   }
-  else if (uuidList.includes(req.query.uuid)) {
-    res.send({ OAuthComplete: false });
+  else if ((uuidList.includes(req.query.uuid)) && (req.query.initialRequest === "true")) {
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email&state=${req.query.uuid}`);
   }
   else {
-    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientID}&redirect_uri=https://${hostname}/auth&response_type=code&scope=openid%20profile%20email&state=${req.query.uuid}`);
+    res.send({ OAuthComplete: false });
   }
 });
 
